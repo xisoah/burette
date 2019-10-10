@@ -63,7 +63,7 @@ def getSecGroup(zone):
     response = client.describe_security_groups()
     a = response['SecurityGroups']
     for item in a:
-        print(item)
+        # print(item)
         if item['Description'] == 'SSH':
             return item['GroupId']
 # getSecGroup('eu-central-1a')
@@ -86,16 +86,7 @@ def getAMI(zone):
     }
     return amiDict[region]
 
-
-# To get list of all Images
-# client = boto3.client('ec2')
-# response = client.describe_images()
-# # with open('data.txt', 'w') as outfile:
-# #     json.dump(response, outfile)
-# for image in response['Images']:
-#     if image['ImageId'] == 'ami-0ac05733838eabc06':
-#         print(image)
-# pprint(getAll())
-response = getAll()
-for key, value in enumerate(response):
-    pprint(key)
+# response = getAll()
+# for key, value in response.items():
+#     for zone in value['zones']:
+#         print(zone['aZone'])

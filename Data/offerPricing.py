@@ -18,13 +18,13 @@ def getDict():
     # If current = gen, use the offer.json that is already there
     if timestamp == current:
         # To load file from json
-        print('offer.json already up-to-date')
+        # print('offer.json already up-to-date')
         with open(Path(__file__).parent / 'offer.json') as f:
             offer_obj = json.load(f)
         f.close()
         return offer_obj
     else:
-        print('Rebuilding offer.json')
+        # print('Rebuilding offer.json')
         link = 'https://pricing.us-east-1.amazonaws.com/offers/v1.0/aws/AmazonEC2/current/index.json'
         user_agent = 'Mozilla/5.0 (X11; Ubuntu; Linux x86_64; rv:68.0) Gecko/20100101 Firefox/68.0'
         headers = {'User-Agent': user_agent}
@@ -78,6 +78,6 @@ def getDict():
         return offer_obj
 
 
-getDict()
+# getDict()
 # offerObj, miscObj = getDicts()
 # pprint.pprint(sorted(offerObj.keys()))

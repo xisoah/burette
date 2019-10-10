@@ -80,14 +80,13 @@ def cancelReq(reqID):
         SpotInstanceRequestIds=[reqID]
     )
     return response
-# { this is response
-#     'CancelledSpotInstanceRequests': [
-#         {
-#             'SpotInstanceRequestId': 'string',
-#             'State': 'active'|'open'|'closed'|'cancelled'|'completed'
-#         },
-#     ]
-# }
+
+
+def stopInstance(instID):
+    client = boto3.client('ec2')
+    response = client.terminate_instances(
+        InstanceIds=[instID]
+    )
 
 
 def listInstances():
@@ -95,8 +94,18 @@ def listInstances():
     response = client.describe_instances(
         MaxResults=500
     )
-    print(response['Reservations'])
-    return response
+    activeInstDict = {}
+    for instance in response['Reservations']:
+        if not instance['Instances'][0]['State']['Name'] == 'terminated':
+            entry = {
+                'Type': instance['Instances'][0]['InstanceType'],
+                'Zone': instance['Instances'][0]['Placement']['AvailabilityZone'],
+                'Key': instance['Instances'][0]['KeyName'],
+                'IP': instance['Instances'][0]['PublicIpAddress'],
+                'SpotID': instance['Instances'][0]['SpotInstanceRequestId'],
+            }
+            activeInstDict[instance['Instances'][0]['InstanceId']] = entry
+    return activeInstDict
 
 
 def addtoILedger(instanceID, token):
@@ -151,7 +160,7 @@ def createSnap():
     )
 
 
-def copySnap(): # Work on this
+def copySnap():  # Work on this
     client = boto3.client('ec2')
     response = client.copy_snapshot(
         Description='This is my copied snapshot.',
@@ -185,5 +194,11 @@ def copySnap(): # Work on this
     # https://github.com/awsdocs/amazon-ec2-user-guide/blob/master/doc_source/ebs-copy-snapshot.md
     # https://docs.aws.amazon.com/cli/latest/reference/ec2/copy-snapshot.html
 
-
-listInstances()
+# To get list of all Images
+# client = boto3.client('ec2')
+# response = client.describe_images()
+# # with open('data.txt', 'w') as outfile:
+# #     json.dump(response, outfile)
+# for image in response['Images']:
+#     if image['ImageId'] == 'ami-0ac05733838eabc06':
+#         print(image)
