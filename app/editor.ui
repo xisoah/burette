@@ -169,7 +169,7 @@
       <widget class="QLabel" name="label_5">
        <property name="geometry">
         <rect>
-         <x>620</x>
+         <x>420</x>
          <y>80</y>
          <width>91</width>
          <height>16</height>
@@ -182,11 +182,24 @@
       <widget class="QLineEdit" name="lineEdit_3">
        <property name="geometry">
         <rect>
-         <x>610</x>
+         <x>410</x>
          <y>100</y>
          <width>181</width>
          <height>31</height>
         </rect>
+       </property>
+      </widget>
+      <widget class="QCheckBox" name="checkBox">
+       <property name="geometry">
+        <rect>
+         <x>610</x>
+         <y>100</y>
+         <width>111</width>
+         <height>20</height>
+        </rect>
+       </property>
+       <property name="text">
+        <string>Delete Volume</string>
        </property>
       </widget>
      </widget>
@@ -198,6 +211,26 @@
         <width>1180</width>
         <height>641</height>
        </rect>
+      </property>
+     </widget>
+     <widget class="QPushButton" name="Spoopy">
+      <property name="geometry">
+       <rect>
+        <x>1150</x>
+        <y>20</y>
+        <width>30</width>
+        <height>30</height>
+       </rect>
+      </property>
+      <property name="text">
+       <string/>
+      </property>
+      <property name="icon">
+       <iconset>
+        <normaloff>refresh.png</normaloff>refresh.png</iconset>
+      </property>
+      <property name="checkable">
+       <bool>false</bool>
       </property>
      </widget>
     </widget>

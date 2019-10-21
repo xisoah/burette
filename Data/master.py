@@ -3,9 +3,6 @@ import Data.ec2infoPricing as ec2infoPricing
 import Data.odPricing as odPricing
 import Data.offerPricing as offerPricing
 import Data.manualPricing as manualPricing
-import json
-import pandas as pd
-import sys
 
 
 def process():

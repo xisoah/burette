@@ -1,10 +1,13 @@
+import paramiko
 from PyQt5 import QtCore, QtGui, QtWidgets
 import Data.master as DataMaster
 import Data.acdetails as Account
-import Creation.master as CreateMaster
 import Creation.instanceTools as iTools
+import Manage.preparer as iPrep
 import pandas as pd
+import pyperclip
 import sys
+import time
 
 insObj = DataMaster.process()
 master_dt = pd.DataFrame.from_dict(insObj, orient='index')
@@ -15,11 +18,7 @@ col = ['PID', 'pretty_name', 'instanceFamily', 'currentGeneration', 'memory', 'p
 'dedicatedEbsThroughput', 'enhancedNetworking', 'us-east', 'us-east-2', 'us-west-2', 'us-west', 'ca-central-1',
 'eu-ireland', 'eu-central-1', 'eu-west-2', 'eu-west-3', 'eu-north-1', 'apac-sin', 'apac-syd', 'apac-tokyo',
 'ap-northeast-2', 'ap-northeast-3', 'ap-south-1', 'sa-east-1', 'ap-east-1', 'me-south-1']
-master_dt = master_dt[col]
-df = master_dt
-
-# excel = 'D:\\Users\\sohai\\Desktop\\burette\\barebones\\Data\\df.xlsx'
-# df = pd.read_excel(excel)
+df = master_dt[col]
 
 
 class PandasModel(QtCore.QAbstractTableModel):
@@ -52,6 +51,8 @@ class Ui_MainWindow(object):
         dfList = df.memory.unique()
         for item in dfList:
             memListTem.append(str(item))
+        if 'nan' in memListTem:
+            memListTem.remove('nan')
         for index, item in enumerate(memListTem):
             memListTem[index] = item.replace(',', '')
         for index, item in enumerate(memListTem):
@@ -60,7 +61,6 @@ class Ui_MainWindow(object):
         memListTem.sort()
         for index, item in enumerate(memListTem):
             memListTem[index] = str(item) + ' GiB'
-        memListTem.insert(0, 'All')
         for index, entry in enumerate(memListTem):
             item = QtWidgets.QListWidgetItem()
             self.memList.addItem(item)
@@ -70,17 +70,18 @@ class Ui_MainWindow(object):
     def populate(self):
         selection = [QtWidgets.QListWidgetItem.text(item) for item in self.memList.selectedItems()]
         choice = selection[0]
-        if choice == 'All':  # Doesn't work
-            model = PandasModel(df)
-            self.tableView.setModel(model)
         if choice[:-4].endswith('.0'):
             choice = choice[:-6] + ' GiB'
             model = PandasModel(df[(df.memory == choice)])
-            self.tableView.setModel(model)
+            self.pricingTableView.setModel(model)
         if not choice[:-4].endswith('.0'):
             model = PandasModel(df[(df.memory == choice)])
-            self.tableView.setModel(model)
+            self.pricingTableView.setModel(model)
         return choice
+
+    def listPricingTable(self):  # Already being called by default below line 181
+        model = PandasModel(df)
+        self.pricingTableView.setModel(model)
 
     def listInstancesTable(self):
         activeInstDict = iTools.listInstances()
@@ -88,7 +89,7 @@ class Ui_MainWindow(object):
         insIDList = list(activeInstDF.index.values)
         activeInstDF['InstanceID'] = insIDList
         initmodel = PandasModel(activeInstDF)
-        self.tableView2.setModel(initmodel)
+        self.instancesTableView.setModel(initmodel)
 
     def addTo_instTypeComboBox(self):
         self.instTypeComboBox.clear()
@@ -103,18 +104,34 @@ class Ui_MainWindow(object):
                 zoneList.append(zone['aZone'])
         self.zoneComboBox.addItems(zoneList)
 
-    def launch(self):
+    def launch(self):  # Can make this more efficient
         iType = str(self.instTypeComboBox.currentText())
         zone = str(self.zoneComboBox.currentText())
         price = self.pricingTextBox.text()
         token = self.tokenTextBox.text()
         print('Now launching ' + iType + ' instance in ' + zone + ' as ' + token + ' for ' + price)
-        ip = CreateMaster.startInstance(token, iType, zone, price)
+        reqID = iTools.reqPteroInstance(token, iType, zone, price)
+        print('Now putting the system to hold for 10 seconds to let the request process')
+        time.sleep(10)
+        instID = iTools.getInstance(reqID)
+        print(instID)
+        iTools.addtoILedger(instID, token)
+        instDict = iTools.readyInst(instID)
+        # self.listInstancesTable()
+        print('Now preparing the instance with the panel')
+        iPrep.prepareInst(instID)  # This runs the preparer code for pteroactyl
+        print('Please use this IP address: ' + instDict['PublicIpAddress'])
+        pyperclip.copy(instDict['PublicIpAddress'])
+        return instDict['PublicIpAddress']
 
     def terminate(self):
+        # if self.volCBox.isChecked(): # Write command to delete volume or not
+        #     ...
         insID = self.instIdTextBox.text()
         activeInstDict = iTools.listInstances()
         iTools.cancelReq(activeInstDict[insID]['SpotID'])
+        print('Now cancelling the spot request and waiting for 10 seconds')
+        time.sleep(10)
         iTools.stopInstance(insID)
         print('Instance ' + insID + ' terminated')
 
@@ -135,9 +152,9 @@ class Ui_MainWindow(object):
 
         # Pricing Tab
         initmodel = PandasModel(df)
-        self.tableView = QtWidgets.QTableView(self.tabPricing)
-        self.tableView.setGeometry(QtCore.QRect(10, 10, 1180, 641))
-        self.tableView.setModel(initmodel)
+        self.pricingTableView = QtWidgets.QTableView(self.tabPricing)
+        self.pricingTableView.setGeometry(QtCore.QRect(10, 10, 1180, 641))
+        self.pricingTableView.setModel(initmodel)
 
         self.memGroup = QtWidgets.QGroupBox(self.tabPricing)
         self.memGroup.setGeometry(QtCore.QRect(10, 660, 1180, 141))
@@ -155,15 +172,21 @@ class Ui_MainWindow(object):
         self.memBtn.setText("Populate")
         self.memBtn.clicked.connect(self.populate)
 
+        self.refreshBtn1 = QtWidgets.QPushButton(self.tabPricing)
+        # self.refreshBtn1.setGeometry(QtCore.QRect(1000, 40, 30, 30))
+        self.refreshBtn1.setGeometry(QtCore.QRect(1150, 20, 30, 30))
+        refIcon = QtGui.QPixmap('D:\\Users\\sohai\\Desktop\\burette\\app\\refresh.png')
+        self.refreshBtn1.setIcon(QtGui.QIcon(refIcon))
+        self.refreshBtn1.clicked.connect(self.listPricingTable)
+
         self.tabs.addTab(self.tabPricing, "")
         MainWindow.setCentralWidget(self.container)
         self.tabs.setTabText(self.tabs.indexOf(self.tabPricing), "Pricing")
         # End
 
         # Instances Tab
-        self.tableView2 = QtWidgets.QTableView(self.tabInstances)
-        self.tableView2.setGeometry(QtCore.QRect(10, 10, 1180, 641))
-        self.listInstancesTable()
+        self.instancesTableView = QtWidgets.QTableView(self.tabInstances)
+        self.instancesTableView.setGeometry(QtCore.QRect(10, 10, 1180, 641))
 
         self.panelGroup = QtWidgets.QGroupBox(self.tabInstances)
         self.panelGroup.setGeometry(QtCore.QRect(10, 660, 1180, 141))
@@ -205,16 +228,26 @@ class Ui_MainWindow(object):
         self.launchBtn.clicked.connect(self.launch)
 
         self.instIdLabel = QtWidgets.QLabel(self.panelGroup)
-        self.instIdLabel.setGeometry(QtCore.QRect(620, 80, 91, 16))
+        self.instIdLabel.setGeometry(QtCore.QRect(420, 80, 91, 16))
         self.instIdLabel.setText("InstanceID")
 
         self.instIdTextBox = QtWidgets.QLineEdit(self.panelGroup)
-        self.instIdTextBox.setGeometry(QtCore.QRect(610, 100, 181, 31))
+        self.instIdTextBox.setGeometry(QtCore.QRect(410, 100, 181, 31))
+
+        self.volCBox = QtWidgets.QCheckBox(self.panelGroup)
+        self.volCBox.setGeometry(QtCore.QRect(610, 100, 111, 20))
+        self.volCBox.setText("Delete Volume")
 
         self.terminateBtn = QtWidgets.QPushButton(self.panelGroup)
         self.terminateBtn.setGeometry(QtCore.QRect(810, 100, 161, 31))
         self.terminateBtn.setText("Terminate")
         self.terminateBtn.clicked.connect(self.terminate)
+
+        self.refreshBtn2 = QtWidgets.QPushButton(self.panelGroup)
+        self.refreshBtn2.setGeometry(QtCore.QRect(1140, 40, 30, 30))
+        refIcon = QtGui.QPixmap('D:\\Users\\sohai\\Desktop\\burette\\app\\refresh.png')
+        self.refreshBtn2.setIcon(QtGui.QIcon(refIcon))
+        self.refreshBtn2.clicked.connect(self.listInstancesTable)
 
         self.tabs.addTab(self.tabInstances, "")
         MainWindow.setCentralWidget(self.container)
